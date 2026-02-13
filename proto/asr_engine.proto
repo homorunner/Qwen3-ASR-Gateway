@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package qwen_asr;
+
+option go_package = "gateway/proto/qwen_asr";
+
+// ASR Engine gRPC Service
+service ASREngine {
+    rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+    rpc PushAudio(PushAudioRequest) returns (PushAudioResponse);
+    rpc FinishSession(FinishSessionRequest) returns (FinishSessionResponse);
+    rpc DestroySession(DestroySessionRequest) returns (DestroySessionResponse);
+    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message SessionConfig {
+    string language = 1;           // 空 = 自动检测
+    string context = 2;
+    int32  sample_rate = 3;        // 音频采样率，默认 16000
+    string encoding = 4;           // "pcm_f32le" | "pcm_s16le"
+    float  chunk_size_sec = 5;
+    int32  unfixed_chunk_num = 6;
+    int32  unfixed_token_num = 7;
+}
+
+message CreateSessionRequest {
+    string session_id = 1;
+    SessionConfig config = 2;
+}
+
+message CreateSessionResponse {
+    bool success = 1;
+    string error_message = 2;
+}
+
+message PushAudioRequest {
+    string session_id = 1;
+    bytes  audio_data = 2;
+}
+
+message PushAudioResponse {
+    string language = 1;
+    string text = 2;
+    bool   updated = 3;       // 是否产生了新的推理结果（buffer 未满时为 false）
+}
+
+message FinishSessionRequest {
+    string session_id = 1;
+}
+
+message FinishSessionResponse {
+    string language = 1;
+    string text = 2;
+}
+
+message DestroySessionRequest {
+    string session_id = 1;
+}
+
+message DestroySessionResponse {
+    bool success = 1;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+    int32 active_sessions = 1;
+    int32 max_sessions = 2;
+    bool  model_loaded = 3;
+    float gpu_memory_used_pct = 4;
+}

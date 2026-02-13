@@ -22,3 +22,7 @@ wheels/
 .vscode/
 venv/
 env/
+.venv/
+logs/
+bin/
+gateway/gateway

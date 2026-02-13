@@ -1,0 +1,31 @@
+server:
+  host: "0.0.0.0"
+  port: 37901
+  websocket_path: "/ws/asr"
+  max_connections: 1024
+
+engines:
+  - id: 0
+    addr: "localhost:50050"
+  - id: 1
+    addr: "localhost:50051"
+  - id: 2
+    addr: "localhost:50052"
+  - id: 3
+    addr: "localhost:50053"
+  - id: 4
+    addr: "localhost:50054"
+  - id: 5
+    addr: "localhost:50055"
+  - id: 6
+    addr: "localhost:50056"
+  - id: 7
+    addr: "localhost:50057"
+
+session:
+  timeout_sec: 300          # 5 min idle timeout
+  max_duration_sec: 3600    # 1 hour max session
+
+health_check:
+  interval_sec: 5
+  failure_threshold: 3
