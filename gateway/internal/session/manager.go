@@ -16,6 +16,11 @@ type Session struct {
 	Finished     bool
 }
 
+// OnExpireFunc is called for each session removed by the cleanup loop.
+// It receives the removed Session so the caller can release engine-side
+// resources (e.g. DestroySession gRPC call).
+type OnExpireFunc func(s *Session)
+
 type Manager struct {
 	sessions map[string]*Session
 	mu       sync.RWMutex
@@ -23,15 +28,18 @@ type Manager struct {
 	timeoutDuration    time.Duration
 	maxDurationTimeout time.Duration
 
+	onExpire OnExpireFunc
+
 	stopCh chan struct{}
 	wg     sync.WaitGroup
 }
 
-func NewManager(timeoutSec, maxDurationSec int) *Manager {
+func NewManager(timeoutSec, maxDurationSec int, onExpire OnExpireFunc) *Manager {
 	return &Manager{
 		sessions:           make(map[string]*Session),
 		timeoutDuration:    time.Duration(timeoutSec) * time.Second,
 		maxDurationTimeout: time.Duration(maxDurationSec) * time.Second,
+		onExpire:           onExpire,
 		stopCh:             make(chan struct{}),
 	}
 }
@@ -136,8 +144,16 @@ func (m *Manager) cleanupLoop() {
 			return
 		case <-ticker.C:
 			expired := m.ExpiredSessions()
-			if len(expired) > 0 {
-				log.Printf("[INFO] Found %d expired sessions to clean up", len(expired))
+			if len(expired) == 0 {
+				continue
+			}
+
+			log.Printf("[INFO] Cleaning up %d expired sessions", len(expired))
+			for _, id := range expired {
+				s := m.Remove(id)
+				if s != nil && m.onExpire != nil {
+					m.onExpire(s)
+				}
 			}
 		}
 	}

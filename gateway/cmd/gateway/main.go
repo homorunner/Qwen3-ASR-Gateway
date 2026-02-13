@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 
 	"gateway/internal/config"
 	"gateway/internal/engine"
+	pb "gateway/proto/qwen_asr"
 	"gateway/internal/session"
 	"gateway/internal/ws"
 )
@@ -55,7 +57,26 @@ func main() {
 	pool.Start()
 	defer pool.Stop()
 
-	sessionMgr := session.NewManager(cfg.Session.TimeoutSec, cfg.Session.MaxDurationSec)
+	// onExpire is called by the session manager's cleanup loop when a session
+	// times out.  It notifies the engine to release resources.
+	onExpire := func(s *session.Session) {
+		ep := pool.GetEndpoint(s.EngineID)
+		if ep == nil {
+			return
+		}
+		ep.DecrSessions()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := ep.Client().DestroySession(ctx, &pb.DestroySessionRequest{
+			SessionId: s.ID,
+		}); err != nil {
+			log.Printf("[WARN] DestroySession on expire for %s: %v", s.ID, err)
+		} else {
+			log.Printf("[INFO] Session expired and destroyed: %s (engine %d)", s.ID, s.EngineID)
+		}
+	}
+
+	sessionMgr := session.NewManager(cfg.Session.TimeoutSec, cfg.Session.MaxDurationSec, onExpire)
 	sessionMgr.Start()
 	defer sessionMgr.Stop()
 
